@@ -1,0 +1,10 @@
+{
+  "name": "usage-band",
+  "version": "0.1.0",
+  "description": "Colorful usage band above the prompt: 5-hour and weekly limits with gradient bars, reset countdown and forecast",
+  "author": { "name": "tiger42", "email": "tiger42@codefoo.org" },
+  "homepage": "https://github.com/tiger42/claude-mods",
+  "repository": "https://github.com/tiger42/claude-mods",
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}

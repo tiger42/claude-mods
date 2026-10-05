@@ -1,0 +1,12 @@
+{
+  "name": "local-mods",
+  "description": "Personal Claude Code mods",
+  "owner": { "name": "tiger42", "email": "tiger42@codefoo.org" },
+  "plugins": [
+    {
+      "name": "usage-band",
+      "source": "./usage-band",
+      "description": "Colorful usage band above the prompt: 5-hour and weekly limits"
+    }
+  ]
+}
