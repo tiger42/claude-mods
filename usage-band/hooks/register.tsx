@@ -47,6 +47,11 @@ const RESET_W = 8
 const PACE_W = 22
 const MAX_BAR = 48
 
+// The desktop's bar is an SVG: CSS pixels per cell of bar width, its height and the track's inset from it
+const CELL_PX = 7
+const BAR_H = 14
+const BAR_INSET = 2
+
 type Bar = { key: string; width: number; used: number; marker: number | null }
 type Row = {
   kind: string
@@ -114,6 +119,7 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // The band is shared: what the plugins beneath draw there stays, beside the bars or under them where there is no room
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const data = await read($, reading)
     if (e.props.hasSurvey || data === null || data.windows.length === 0) {
@@ -122,6 +128,7 @@ export const register: Register = on => {
       return next(e)
     }
 
+    const below = await next(e)
     const now = await $.clock.now()
     const rows = sorted(data.windows).map(w => describe(w, now))
     const hasPace = e.props.bodyColumns - (PILL_W + PCT_W + RESET_W + PACE_W + 4) >= 12
@@ -136,43 +143,61 @@ export const register: Register = on => {
         marker: row.elapsed === null ? null : Math.min(width - 1, Math.floor(row.elapsed * width)),
       },
     }))
-    site = { requestId: e.requestId, bars: lines.map(line => line.bar) }
-
     const { Box, Text } = $.ui.resolve(e)
     const Raster = e.surface === 'terminal' ? $.ui.resolve(e).Raster : null
+    const Svg = e.surface === 'desktop' ? $.ui.resolve(e).Svg : null
     const age = now - data.at
 
-    return (
-      <Box flexDirection="column">
-        {lines.map(({ row, bar }) => {
-          const full = Math.round((Math.min(row.used, 100) / 100) * width)
+    // Only the terminal's Rasters take the shimmer's frames
+    if (Raster !== null) {
+      site = { requestId: e.requestId, bars: lines.map(line => line.bar) }
+    }
 
-          return (
-            <Box flexDirection="row" gap={1}>
-              <Text backgroundColor={row.pill} color="#ffffff" bold>
-                {row.label}
-              </Text>
-              {Raster === null ? (
-                <Box flexDirection="row">
-                  <Text color={row.tip}>{'█'.repeat(full)}</Text>
-                  <Text dimColor>{'░'.repeat(width - full)}</Text>
-                </Box>
-              ) : (
+    return (
+      <Box flexDirection="row" flexWrap="wrap" justifyContent="space-between" columnGap={1}>
+        <Box flexDirection="column">
+          {lines.map(({ row, bar }) =>
+            Raster !== null ? (
+              <Box flexDirection="row" gap={1}>
+                <Text backgroundColor={row.pill} color="#ffffff" bold>
+                  {row.label}
+                </Text>
                 <Raster key={bar.key} columns={width} rows={1} cells={cells(bar, null)} />
-              )}
-              <Text color={row.tip} bold>
-                {`${Math.round(row.used)}%`.padStart(PCT_W)}
-              </Text>
-              <Text dimColor>{row.reset.padEnd(RESET_W)}</Text>
-              {hasPace && row.pace !== null && <Text color={row.pace.color}>{row.pace.text}</Text>}
-            </Box>
-          )
-        })}
-        {age > STALE_AFTER && (
-          <Text dimColor italic>
-            As of {duration(age)} ago · updates with the next response
-          </Text>
-        )}
+                <Text color={row.tip} bold>
+                  {`${Math.round(row.used)}%`.padStart(PCT_W)}
+                </Text>
+                <Text dimColor>{row.reset.padEnd(RESET_W)}</Text>
+                {hasPace && row.pace !== null && <Text color={row.pace.color}>{row.pace.text}</Text>}
+              </Box>
+            ) : (
+              // The desktop sets a proportional font and folds runs of spaces: boxes of fixed width keep the columns
+              <Box flexDirection="row" alignItems="center" gap={1}>
+                <Box width={PILL_W} justifyContent="center" backgroundColor={row.pill}>
+                  <Text color="#ffffff" bold>
+                    {row.label.trim()}
+                  </Text>
+                </Box>
+                {Svg !== null && (
+                  <Svg source={svg(row, width)} alt={describeBar(row)} width={width * CELL_PX} height={BAR_H} />
+                )}
+                {/* A proportional "100%" runs wider than four cells */}
+                <Box minWidth={PCT_W + 1} justifyContent="flex-end">
+                  <Text color={row.tip} bold>{`${Math.round(row.used)}%`}</Text>
+                </Box>
+                <Box minWidth={RESET_W}>
+                  <Text dimColor>{row.reset}</Text>
+                </Box>
+                {hasPace && row.pace !== null && <Text color={row.pace.color}>{row.pace.text}</Text>}
+              </Box>
+            ),
+          )}
+          {age > STALE_AFTER && (
+            <Text dimColor italic>
+              As of {duration(age)} ago · updates with the next response
+            </Text>
+          )}
+        </Box>
+        {below}
       </Box>
     )
   })
@@ -333,6 +358,38 @@ function cells(bar: Bar, head: number | null): string {
   }
 
   return base64(new Uint8Array(words.buffer))
+}
+
+// The desktop's bar: the gradient up to the fill over a track, the pace marker a white line with a dark edge that shows in either theme
+function svg(row: Row, width: number): string {
+  const w = width * CELL_PX
+  const fill = round((Math.min(row.used, 100) / 100) * w)
+  const track = BAR_H - 2 * BAR_INSET
+  const stops = STOPS.map(([at, color]) => `<stop offset="${at}" stop-color="${hex(color)}"/>`).join('')
+  const x = row.elapsed === null ? null : round(Math.min(w - 2, Math.max(2, row.elapsed * w)))
+  const marker =
+    x === null
+      ? ''
+      : `<rect x="${round(x - 1.5)}" width="3" height="${BAR_H}" rx="1" fill="#1e1e2a" fill-opacity="0.6"/>` +
+        `<rect x="${round(x - 0.5)}" y="1" width="1" height="${BAR_H - 2}" fill="#ffffff"/>`
+
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${BAR_H}" viewBox="0 0 ${w} ${BAR_H}">` +
+    `<defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${stops}</linearGradient>` +
+    `<clipPath id="c"><rect y="${BAR_INSET}" width="${w}" height="${track}" rx="${track / 2}"/></clipPath></defs>` +
+    `<g clip-path="url(#c)"><rect width="${w}" height="${BAR_H}" fill="#8b8ba0" fill-opacity="0.3"/>` +
+    `<rect width="${fill}" height="${BAR_H}" fill="url(#g)"/></g>${marker}</svg>`
+  )
+}
+
+function describeBar(row: Row): string {
+  const elapsed = row.elapsed === null ? '' : `, ${Math.round(row.elapsed * 100)}% of the window elapsed`
+
+  return `${row.label.trim()}: ${Math.round(row.used)}% used${elapsed}`
+}
+
+function round(n: number): number {
+  return Math.round(n * 10) / 10
 }
 
 function colorAt(t: number): number {

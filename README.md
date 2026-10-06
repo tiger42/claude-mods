@@ -41,11 +41,18 @@ claude plugin install color-chooser@local-mods --scope user
 
 ### usage-band
 
-![usage-band: 5-hour and weekly limit bars above the prompt](images/usage-band.png)
+![usage-band: 5-hour and weekly limit bars above the prompt (CLI)](images/usage-band.png)
 
-Band above the prompt showing the 5-hour and weekly rate limits of a Claude subscription. Each limit gets a gradient bar, a white tick for the time elapsed in the window, a countdown to the reset and a forecast at the current rate (`→ ~75% at reset` or `▲ full in 40m`). A light sweeps the bars while Claude works. A new session starts from the last reading of any other session. What other mods draw in the band stays beside the bars, or moves under them when there is no room. Collapse the band with `ctrl+x ctrl+a`.
+![usage-band: 5-hour and weekly limit bars above the prompt (app)](images/usage-band-app.png)
 
-Draws in the terminal and in the Desktop app's Code tab. Shows nothing for API-key accounts, which have no rate-limit windows.
+Band above the prompt showing the 5-hour and weekly rate limits of a Claude subscription. Each limit gets a gradient bar, a white tick for the time elapsed in the window, a countdown to the reset and a forecast at the current rate (`→ ~75% at reset` or `▲ full in 40m`). In the terminal a light sweeps the bars while Claude works. A new session starts from the last reading of any other session on the same machine. What other mods draw in the band stays beside the bars, or moves under them when there is no room. Collapse the band with `ctrl+x ctrl+a`.
+
+How to read it:
+
+- **White tick:** how much of the window has already passed. If the bar ends left of it, you are using the limit more slowly than it allows; right of it, faster.
+- **Forecast:** the pace so far, carried forward: used ÷ share of the window elapsed.
+
+Draws in the terminal and in the Desktop app's Code tab, where the bars are drawn as SVG. Shows nothing for API-key accounts, which have no rate-limit windows.
 
 ```bash
 claude plugin install usage-band@local-mods --scope user

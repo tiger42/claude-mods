@@ -20,14 +20,14 @@ const LIMITS = [
   { kind: 'five_hour', percentUsed: 60, resetsAt: new Date(NOW + 4 * HOUR).toISOString() },
 ]
 
-// What the engine answers beneath the plugin: the session events, and an empty band of its own
-function beneath(on: On) {
+// What the engine answers beneath the plugin: the session events, and the band of its own (`below` stands for another plugin's)
+function beneath(on: On, below?: string) {
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('session.measure', (_$, e) => ({ changed: e.changed }))
   on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
-    const { Box } = $.ui.resolve(e)
+    const { Box, Text } = $.ui.resolve(e)
 
-    return <Box />
+    return below === undefined ? <Box /> : <Box><Text>{below}</Text></Box>
   })
 }
 
@@ -40,11 +40,11 @@ test('draws both windows with countdown and forecast after a measurement', async
 
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ plugin: 'usage-band', surface, component: 'AbovePrompt', props: BAND })
-    const labels = (await ui.findAll({ text: /^ (5-hour|Weekly) $/ })).map(found => found.text)
+    const labels = (await ui.findAll({ type: 'Text', text: /^ ?(5-hour|Weekly) ?$/ })).map(found => found.text.trim())
 
-    expect(labels).toEqual([' 5-hour ', ' Weekly '])
-    expect(await ui.find({ text: / 60%/ })).toBeDefined()
-    expect(await ui.find({ text: / 19%/ })).toBeDefined()
+    expect(labels).toEqual(['5-hour', 'Weekly'])
+    expect(await ui.find({ text: /^ *60%$/ })).toBeDefined()
+    expect(await ui.find({ text: /^ *19%$/ })).toBeDefined()
     expect(await ui.find({ text: /↻ 4h 00m/ })).toBeDefined()
     expect(await ui.find({ text: /↻ 3d 0h/ })).toBeDefined()
     expect(await ui.find({ text: '▲ full in 40m' })).toBeDefined()
@@ -52,11 +52,35 @@ test('draws both windows with countdown and forecast after a measurement', async
     expect(await ui.find({ text: /As of/ })).toBeUndefined()
 
     const raster = await ui.find({ type: 'Raster', key: 'bar-five_hour' })
+    const bars = await ui.findAll({ type: 'Svg' })
     if (surface === 'terminal') {
       expect(raster?.props.columns).toBe(48)
+      expect(bars).toHaveLength(0)
     } else {
       expect(raster).toBeUndefined()
+      // Both bars equally wide, so the columns after them line up
+      expect(bars.map(found => found.props.width)).toEqual([336, 336])
+      expect(bars[0]?.props.alt).toBe('5-hour: 60% used, 20% of the window elapsed')
+      // 60% of 336 px filled, the pace marker's white line at 20%
+      expect(String(bars[0]?.props.source)).toContain('<rect width="201.6"')
+      expect(String(bars[0]?.props.source)).toContain('<rect x="66.7" y="1" width="1"')
     }
+  }
+})
+
+test('keeps what other plugins draw in the band beside the bars', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on, 'palette button')
+  mock.store(on)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  await $.session.measure({ context: { window: 200_000 }, rateLimits: LIMITS, changed: ['rateLimits'] })
+
+  for (const surface of SURFACES) {
+    const ui = await $.ui.mount({ plugin: 'usage-band', surface, component: 'AbovePrompt', props: BAND })
+
+    expect(await ui.find({ text: /^ ?5-hour ?$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'palette button' })).toBeDefined()
+    await ui.unmount()
   }
 })
 
@@ -159,4 +183,25 @@ test('a light runs along the bars while a turn runs and stops when it ends', asy
     const last = blits.filter(blit => blit.key === key).at(-1)
     expect(last?.cells).toBe(drawn?.props.cells)
   }
+})
+
+test('the desktop bars have no Raster for the light to paint', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW })
+  beneath(on)
+  mock.store(on)
+  on('turn.start', (_$, e) => ({ turnId: e.turnId }))
+  const blits: string[] = []
+  on('ui.blit', (_$, e) => {
+    blits.push(e.key)
+
+    return { value: {} }
+  })
+
+  await $.session.start({ cwd: '/tmp', surface: 'desktop', isInteractive: true })
+  await $.session.measure({ context: { window: 200_000 }, rateLimits: LIMITS, changed: ['rateLimits'] })
+  await $.ui.mount({ plugin: 'usage-band', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+
+  await $.turn.start({ text: 'hi', turnId: 't1' })
+  await clock.advance(400)
+  expect(blits).toHaveLength(0)
 })
