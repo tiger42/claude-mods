@@ -7,6 +7,11 @@
       "name": "usage-band",
       "source": "./usage-band",
       "description": "Colorful usage band above the prompt: 5-hour and weekly limits"
+    },
+    {
+      "name": "color-chooser",
+      "source": "./color-chooser",
+      "description": "Palette button above the prompt: pick the session's prompt bar color with a click"
     }
   ]
 }

@@ -1,0 +1,10 @@
+{
+  "name": "color-chooser",
+  "version": "0.2.0",
+  "description": "Palette button above the prompt: pick the session's prompt bar color (/color) with a click",
+  "author": { "name": "tiger42", "email": "tiger42@codefoo.org" },
+  "homepage": "https://github.com/tiger42/claude-mods",
+  "repository": "https://github.com/tiger42/claude-mods",
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}

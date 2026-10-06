@@ -1,0 +1,4 @@
+{
+  "description": "The color-chooser hooks module",
+  "modules": ["./register.tsx"]
+}
