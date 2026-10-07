@@ -1,10 +1,18 @@
 {
   "name": "color-chooser",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Palette button above the prompt: pick the session's prompt bar color (/color) with a click",
   "author": { "name": "tiger42", "email": "tiger42@codefoo.org" },
   "homepage": "https://github.com/tiger42/claude-mods",
   "repository": "https://github.com/tiger42/claude-mods",
   "license": "MIT",
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "viaPrompt": {
+      "type": "boolean",
+      "title": "Set the color via the prompt while Claude works",
+      "description": "A color picked while Claude works goes into the empty prompt as /color, and Enter sets it at once. A draft in the prompt is never replaced: the color then waits for the turn to end, as it does with this off.",
+      "default": false
+    }
+  }
 }
