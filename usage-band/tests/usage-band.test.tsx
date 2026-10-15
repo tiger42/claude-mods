@@ -3,7 +3,9 @@ import { expect, mock, test } from 'claude-code/testing'
 
 const NOW = Date.parse('2026-10-05T12:00:00Z')
 const HOUR = 3_600_000
-const SURFACES = ['terminal', 'desktop'] as const
+// The surfaces that draw the bars as SVG, and all of them
+const SVG_SURFACES = ['desktop', 'vscode'] as const
+const SURFACES = ['terminal', ...SVG_SURFACES] as const
 
 const BAND = {
   hasSurvey: false,
@@ -58,12 +60,21 @@ test('draws both windows with countdown and forecast after a measurement', async
       expect(bars).toHaveLength(0)
     } else {
       expect(raster).toBeUndefined()
-      // Both bars equally wide, so the columns after them line up
-      expect(bars.map(found => found.props.width)).toEqual([336, 336])
+      // Each SVG fills a box that grows alike in both rows from the same least width, so the columns after them line up
+      const boxes = await Promise.all(['bar-five_hour', 'bar-seven_day'].map(key => ui.find({ type: 'Box', key })))
+      expect(boxes.map(found => [found?.props.width, found?.props.flexGrow])).toEqual([
+        [10, 1],
+        [10, 1],
+      ])
+      // Wider than any box, so the surface draws it as wide as its box; the markup unscaled at that width
+      expect(bars.map(found => found.props.width)).toEqual([4096, 4096])
+      expect(String(bars[0]?.props.source)).toContain('width="100%" height="14"')
+      expect(String(bars[0]?.props.source)).not.toContain('viewBox')
       expect(bars[0]?.props.alt).toBe('5-hour: 60% used, 20% of the window elapsed')
-      // 60% of 336 px filled, the pace marker's white line at 20%
-      expect(String(bars[0]?.props.source)).toContain('<rect width="201.6"')
-      expect(String(bars[0]?.props.source)).toContain('<rect x="66.7" y="1" width="1"')
+      // 60% filled, the pace marker at 20%: shifted by 3 px × 20% so that it stays whole at either end
+      expect(String(bars[0]?.props.source)).toContain('<rect width="60%"')
+      expect(String(bars[0]?.props.source)).toContain('<svg x="20%" overflow="visible"><rect x="-0.6" width="3"')
+      expect(String(bars[0]?.props.source)).toContain('<rect x="0.4" y="1" width="1"')
     }
   }
 })
@@ -128,6 +139,27 @@ test('narrow band drops the forecast and shrinks the bar', async ($, on) => {
   expect((await ui.find({ type: 'Raster', key: 'bar-five_hour' }))?.props.columns).toBe(27)
 })
 
+for (const surface of SVG_SURFACES) {
+  test(`a narrow band on ${surface} drops the forecast and leaves the bar the room`, async ($, on) => {
+    mock.clock(on, { now: NOW })
+    beneath(on)
+    mock.store(on)
+    await $.session.start({ cwd: '/tmp', surface, isInteractive: true })
+    await $.session.measure({ context: { window: 200_000 }, rateLimits: LIMITS, changed: ['rateLimits'] })
+
+    const ui = await $.ui.mount({
+      plugin: 'usage-band',
+      surface,
+      component: 'AbovePrompt',
+      props: { ...BAND, bodyColumns: 31 },
+    })
+
+    expect(await ui.find({ text: /full in|at reset/ })).toBeUndefined()
+    expect((await ui.find({ type: 'Box', key: 'bar-five_hour' }))?.props.flexGrow).toBe(1)
+    expect(await ui.findAll({ type: 'Svg' })).toHaveLength(2)
+  })
+}
+
 test('draws nothing without a reading or while a survey holds the band', async ($, on) => {
   mock.clock(on, { now: NOW })
   beneath(on)
@@ -185,23 +217,25 @@ test('a light runs along the bars while a turn runs and stops when it ends', asy
   }
 })
 
-test('the desktop bars have no Raster for the light to paint', async ($, on) => {
-  const clock = mock.clock(on, { now: NOW })
-  beneath(on)
-  mock.store(on)
-  on('turn.start', (_$, e) => ({ turnId: e.turnId }))
-  const blits: string[] = []
-  on('ui.blit', (_$, e) => {
-    blits.push(e.key)
+for (const surface of SVG_SURFACES) {
+  test(`the SVG bars on ${surface} have no Raster for the light to paint`, async ($, on) => {
+    const clock = mock.clock(on, { now: NOW })
+    beneath(on)
+    mock.store(on)
+    on('turn.start', (_$, e) => ({ turnId: e.turnId }))
+    const blits: string[] = []
+    on('ui.blit', (_$, e) => {
+      blits.push(e.key)
 
-    return { value: {} }
+      return { value: {} }
+    })
+
+    await $.session.start({ cwd: '/tmp', surface, isInteractive: true })
+    await $.session.measure({ context: { window: 200_000 }, rateLimits: LIMITS, changed: ['rateLimits'] })
+    await $.ui.mount({ plugin: 'usage-band', surface, component: 'AbovePrompt', props: BAND })
+
+    await $.turn.start({ text: 'hi', turnId: 't1' })
+    await clock.advance(400)
+    expect(blits).toHaveLength(0)
   })
-
-  await $.session.start({ cwd: '/tmp', surface: 'desktop', isInteractive: true })
-  await $.session.measure({ context: { window: 200_000 }, rateLimits: LIMITS, changed: ['rateLimits'] })
-  await $.ui.mount({ plugin: 'usage-band', surface: 'desktop', component: 'AbovePrompt', props: BAND })
-
-  await $.turn.start({ text: 'hi', turnId: 't1' })
-  await clock.advance(400)
-  expect(blits).toHaveLength(0)
-})
+}
