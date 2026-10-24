@@ -1,34 +1,32 @@
 # claude-mods
 
-Personal [Claude Code mods](https://code.claude.com/docs/en/plugins/mods/overview), packaged as a plugin marketplace named `tiger42`.
+Personal [Claude Code mods](https://code.claude.com/docs/en/plugins/mods/overview), packaged as a plugin marketplace.
 
-Requires Claude Code 2.1.287 or later.
+Mods run in Claude Code: in the terminal, in the Desktop app's Code tab and in the VS Code extension, not in chat or Cowork. They need Claude Code 2.1.287 or later; the Desktop app brings its own copy, which needs 2.1.286 (`/status` in a Code tab session shows it), and the VS Code extension draws them from 2.1.299. They don't load in cloud sessions or in the Desktop app's WSL sessions.
 
-## Setup
+## Install
+
+There are two ways. If a computer has a mod both ways, Claude Code loads the command-line copy and leaves out the one from your account.
+
+### In the Claude app
+
+No command line needed. The mods are saved to your claude.ai account and load in every Claude Code session signed in to it, on any computer; sessions signed in with an API key or a token don't get them.
+
+In the Desktop app, under **Customize** → **Plugins**, add `tiger42/claude-mods` as a marketplace from a repository, then add the mod and start a new Claude Code session. The app lists the marketplace as `claude-mods`; to see its mods, filter **Discover** by that **Source**. Updating, turning off and removing work from the mod's page there. [Anthropic's guide](https://claude.com/docs/plugins/overview) has the steps in detail.
+
+### On the command line
+
+The mods are installed on this computer only, for the terminal, the Desktop app and VS Code alike. This takes the Claude Code CLI: [install it](https://code.claude.com/docs/en/setup). On Windows, if the installer reports that `.local\bin` is not in your PATH, [add it](https://code.claude.com/docs/en/troubleshoot-install#verify-your-path) and open a new terminal.
 
 ```bash
 claude plugin marketplace add tiger42/claude-mods
+claude plugin install <mod>@tiger42    # for you, in every project
+claude plugin disable <mod>@tiger42    # turn it off again
 ```
 
-Claude Code fetches the marketplace from GitHub, so there is nothing to clone. Adding it takes the Claude Code CLI, also if you use the mods only in the Desktop app, which can't add a marketplace itself: [install the CLI](https://code.claude.com/docs/en/setup). On Windows, if the installer reports that `.local\bin` is not in your PATH, [add it](https://code.claude.com/docs/en/troubleshoot-install#verify-your-path) and open a new terminal.
+Add `--scope project` to the install to record the mod in the current repository's `.claude/settings.json`, so it's on for others working there once they install it too. Run `/reload-plugins` to load a mod into a terminal session that is already open.
 
-To update, run `claude plugin marketplace update tiger42`, then `claude plugin update <mod>@tiger42` for each mod you use, and start a new session. Or let Claude Code do it: in `/plugin`, go to **Marketplaces**, select `tiger42` and choose **Enable auto-update**.
-
-## Enable a mod
-
-```bash
-claude plugin install <mod>@tiger42 --scope user     # all projects
-claude plugin install <mod>@tiger42 --scope project  # this repo, via .claude/settings.json
-claude plugin disable <mod>@tiger42                  # turn off again
-```
-
-Or use `/plugin` in a terminal session. Run `/reload-plugins` to load a mod into a session that is already open. The Desktop app and the VS Code extension read the same settings as the terminal, so a mod installed at user scope loads there too.
-
-### In the Desktop app
-
-Once the marketplace is added, the app installs the mods itself: in a session in the Code tab, click **+** next to the prompt box, select **Add plugins** (or **Plugins**, then **Browse plugins**), open the `tiger42` marketplace and add the mod. It loads in that same session. The plugin browser's search doesn't find these mods, so open the marketplace instead. **Plugins** → **Manage plugins** in the same menu turns a mod off or removes it.
-
-The app runs its own copy of Claude Code, which needs 2.1.286 or later for mods; `/status` in a Code tab session shows its version. Mods don't load in WSL or cloud sessions, and of the mods below only usage-band draws in the app.
+To update, run `claude plugin marketplace update tiger42`, then `claude plugin update <mod>@tiger42`, and start a new session. Or let Claude Code do it: in `/plugin` in the terminal, go to **Marketplaces**, select `tiger42` and choose **Enable auto-update**.
 
 ## Mods
 
@@ -46,10 +44,6 @@ The swatches are painted through the theme exactly as the prompt bar is, so they
 
 Shares the band with other mods: the button sits beside whatever they draw there. Terminal only: the session color tints the terminal's prompt bar and nothing in the Desktop app, so the button and `/colors` stay out of other surfaces.
 
-```bash
-claude plugin install color-chooser@tiger42 --scope user
-```
-
 ### usage-band
 
 ![usage-band: 5-hour and weekly limit bars above the prompt (CLI)](images/usage-band.png)<br>
@@ -61,7 +55,7 @@ claude plugin install color-chooser@tiger42 --scope user
 ![usage-band: 5-hour and weekly limit bars above the prompt (VS Code)](images/usage-band-vscode.png)<br>
 <sub>VS Code extension</sub>
 
-Band above the prompt showing the 5-hour and weekly rate limits of a Claude subscription. Each limit gets a gradient bar, a white tick for the time elapsed in the window, a countdown to the reset and a forecast at the current rate (`→ ~75% at reset` or `▲ full in 40m`). In the terminal a light sweeps the bars while Claude works. A new session starts from the last reading of any other session on the same machine. What other mods draw in the band stays beside the bars, or moves under them when there is no room. Collapse the band with `ctrl+x ctrl+a`.
+Band above the prompt showing the 5-hour and weekly rate limits of a Claude subscription. Each limit gets a gradient bar, a white tick for the time elapsed in the window, a countdown to the reset and a forecast at the current rate (`→ ~75% at reset` or `▲ full in 40m`). In the terminal a light sweeps the bars while Claude works. A new session starts from the last reading of any other session on the same machine. What other mods draw in the band stays beside the bars, or moves under them when there is no room. In the terminal, collapse the band with `ctrl+x ctrl+a`.
 
 How to read it:
 
@@ -69,10 +63,6 @@ How to read it:
 - **Forecast:** the pace so far, carried forward: used ÷ share of the window elapsed.
 
 Draws in the terminal, in the Desktop app's Code tab and in the VS Code extension; outside the terminal the bars are drawn as SVG and grow with the window into the room beside the figures. Shows nothing for API-key accounts, which have no rate-limit windows.
-
-```bash
-claude plugin install usage-band@tiger42 --scope user
-```
 
 ## Development
 
@@ -86,7 +76,7 @@ claude plugin test ./<mod>       # runs <mod>/tests/*.test.ts(x)
 
 To add a mod, create its folder, list it under `plugins` in `.claude-plugin/marketplace.json` and add a section above.
 
-Claude Code tells an update by the `version` in a mod's `.claude-plugin/plugin.json`. Raise it with every change to a mod, or a marketplace added from GitHub keeps the old copy. A change outside the mod folders, such as to this README, needs no bump.
+An install from GitHub, through the app or on the command line, tells an update by the `version` in a mod's `.claude-plugin/plugin.json`, so raise it with every change to a mod. A change outside the mod folders, such as to this README, needs no bump.
 
 ### Use a local clone as the marketplace
 
