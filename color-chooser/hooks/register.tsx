@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderSurface } from 'claude-code'
+import type { EngineInterface, Register, RenderElement, RenderInput, RenderSurface } from 'claude-code'
 
 import type { SessionColor } from '../types'
 
@@ -109,27 +109,29 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  // The palette button sits at the right end of the terminal's band, beside whatever the plugins beneath draw
+  // The palette button sits at the right end of the terminal's band, beside whatever the plugins beneath draw. Where
+  // the engine asks each plugin for a row of its own, this row holds the button alone
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const below = await next(e)
     if (e.props.hasSurvey || e.surface !== 'terminal') {
       return below
     }
 
-    const { Box, Button, Text } = $.ui.resolve(e)
-    const notice = await noticeOf($)
+    return withButton($, e, below)
+  })
 
-    // Beside the button, a dot in the color and a line on it stay while the person has something to wait or press for
-    return (
-      <Box flexDirection="row" justifyContent="space-between" gap={1}>
-        <Box flexShrink={1}>{below}</Box>
-        <Box flexDirection="row" gap={1}>
-          {notice !== null && <Text color={shade(notice.color, e.surface)}>●</Text>}
-          {notice !== null && <Text>{notice.text}</Text>}
-          <Button key="open" plain label="🎨" onPress={() => void openPicker($)} />
-        </Box>
-      </Box>
-    )
+  // The engine stacks the plugins' rows one under another: the button leaves its own row for the right end of the
+  // others, so it shares the top line with the bars instead of taking a line of its own under them
+  on('ui.render', { component: 'AbovePromptList' }, async ($, e, next) => {
+    const others = e.props.rows.filter(row => row.plugin !== PLUGIN)
+    const isOwnDrawn = others.length < e.props.rows.length
+    if (e.props.hasSurvey || e.surface !== 'terminal' || !isOwnDrawn || others.length === 0) {
+      return next(e)
+    }
+
+    const stacked = await next({ ...e, props: { ...e.props, rows: others } })
+
+    return withButton($, e, stacked)
   })
 
   // While the /color line the picker put there is in the prompt box, the hint line says what Enter does
@@ -228,6 +230,24 @@ export const register: Register = (on, options) => {
 
     return next(e)
   })
+}
+
+// The band's tree with the palette button at its right end. Beside the button, a dot in the color and a line on it stay
+// while the person has something to wait or press for
+async function withButton($: EngineInterface, e: RenderInput<'AbovePrompt' | 'AbovePromptList'>, below: RenderElement) {
+  const { Box, Button, Text } = $.ui.resolve(e)
+  const notice = await noticeOf($)
+
+  return (
+    <Box flexDirection="row" justifyContent="space-between" gap={1}>
+      <Box flexShrink={1}>{below}</Box>
+      <Box flexDirection="row" gap={1}>
+        {notice !== null && <Text color={shade(notice.color, e.surface)}>●</Text>}
+        {notice !== null && <Text>{notice.text}</Text>}
+        <Button key="open" plain label="🎨" onPress={() => void openPicker($)} />
+      </Box>
+    </Box>
+  )
 }
 
 async function openPicker($: EngineInterface) {

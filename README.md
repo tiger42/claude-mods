@@ -42,7 +42,7 @@ To skip the wait, check **Via prompt** in the picker (`p`; also under `/config` 
 
 The swatches are painted through the theme exactly as the prompt bar is, so they look the same in any color depth. With 256 colors or more the picker offers all eight colors and `default`. In 16 colors (`TERM=xterm` with no `COLORTERM`, typical over SSH) orange draws as red, blue as cyan and pink as purple, so it offers only red, green, yellow, purple, cyan and `default`; `COLORTERM=truecolor` brings the rest back if the terminal supports it. To switch it on, check that `printf '\e[38;2;217;119;87m██ orange\e[0m\n'` prints orange rather than red, then add `export COLORTERM=truecolor` to the shell profile (`~/.bashrc`) of the machine Claude Code runs on, the server when you connect over SSH, and start Claude Code anew. A session moved to the background (from the sessions overview) always runs in full color, whatever the terminal it was started from, so the picker there offers all eight.
 
-Shares the band with other mods: the button sits beside whatever they draw there. Terminal only: the session color tints the terminal's prompt bar and nothing in the Desktop app, so the button and `/colors` stay out of other surfaces.
+Shares the band with other mods: Claude Code gives each mod there a row of its own and stacks them, and the button leaves its own row for the right end of the first one, beside the band's `[-]`. Terminal only: the session color tints the terminal's prompt bar and nothing in the Desktop app, so the button and `/colors` stay out of other surfaces.
 
 ### usage-band
 
@@ -55,7 +55,7 @@ Shares the band with other mods: the button sits beside whatever they draw there
 ![usage-band: 5-hour and weekly limit bars above the prompt (VS Code)](images/usage-band-vscode.png)<br>
 <sub>VS Code extension</sub>
 
-Band above the prompt showing the 5-hour and weekly rate limits of a Claude subscription. Each limit gets a gradient bar, a white tick for the time elapsed in the window, a countdown to the reset and a forecast at the current rate (`→ ~75% at reset` or `▲ full in 40m`). In the terminal a light sweeps the bars while Claude works. A new session starts from the last reading of any other session on the same machine. What other mods draw in the band stays beside the bars, or moves under them when there is no room. In the terminal, collapse the band with `ctrl+x ctrl+a`.
+Band above the prompt showing the 5-hour and weekly rate limits of a Claude subscription. Each limit gets a gradient bar, a white tick for the time elapsed in the window, a countdown to the reset and a forecast at the current rate (`→ ~75% at reset` or `▲ full in 40m`). In the terminal a light sweeps the bars while Claude works. A new session starts from the last reading of any other session on the same machine. Claude Code gives each mod in the band a row of its own and stacks them: other mods' rows go under the bars, and the 🎨 button of color-chooser sits at the right end of their first line. In the terminal, collapse the band with `ctrl+x ctrl+a`.
 
 How to read it:
 

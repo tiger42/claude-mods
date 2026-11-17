@@ -9,6 +9,7 @@ const SURFACES = ['terminal', ...SVG_SURFACES] as const
 
 const BAND = {
   hasSurvey: false,
+  isCollapsed: false,
   isWorking: false,
   maxRows: 10,
   bodyColumns: 100,
@@ -22,7 +23,8 @@ const LIMITS = [
   { kind: 'five_hour', percentUsed: 60, resetsAt: new Date(NOW + 4 * HOUR).toISOString() },
 ]
 
-// What the engine answers beneath the plugin: the session events, and the band of its own (`below` stands for another plugin's)
+// What the engine answers beneath the plugin: the session events, and the row of its own (`below` stands for what a hook
+// beneath draws there, as another plugin's band on engines that ask one chain for the whole band)
 function beneath(on: On, below?: string) {
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('session.measure', (_$, e) => ({ changed: e.changed }))
@@ -79,7 +81,7 @@ test('draws both windows with countdown and forecast after a measurement', async
   }
 })
 
-test('keeps what other plugins draw in the band beside the bars', async ($, on) => {
+test('keeps what the hooks beneath draw in its row beside the bars', async ($, on) => {
   mock.clock(on, { now: NOW })
   beneath(on, 'palette button')
   mock.store(on)

@@ -1,4 +1,4 @@
-import type { On } from 'claude-code'
+import type { AbovePromptRow, On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine, MockClock } from 'claude-code/testing'
 
@@ -14,11 +14,17 @@ const COLORS_16 = { TERM: 'xterm' }
 
 const BAND = {
   hasSurvey: false,
+  isCollapsed: false,
   isWorking: false,
   maxRows: 10,
   bodyColumns: 100,
   scroll: { offset: 0, bodyRows: 9 },
   view: {},
+}
+
+// Each plugin's settled row, a line of text naming it
+function rows(...plugins: string[]): AbovePromptRow[] {
+  return plugins.map(plugin => ({ plugin, tree: { type: 'Box', children: [{ type: 'Text', children: [`${plugin} row`] }] } }))
 }
 
 // A slash command as the person types it
@@ -112,6 +118,12 @@ function beneath(on: On, { env = TRUECOLOR, below, queue, draft = '' }: World = 
 
     return below === undefined ? <Box /> : <Box><Text>{below}</Text></Box>
   })
+  // Core stacks the plugins' rows one under another
+  on('ui.render', { component: 'AbovePromptList' }, ($, e) => {
+    const { Box } = $.ui.resolve(e)
+
+    return <Box flexDirection="column">{e.props.rows.map(row => row.tree)}</Box>
+  })
   on('ui.render', { component: 'PromptHint' }, ($, e) => {
     const { Text } = $.ui.resolve(e)
 
@@ -184,6 +196,45 @@ test('the band yields to a survey', async ($, on) => {
       props: { ...BAND, hasSurvey: true },
     })
 
+    expect(await ui.find({ type: 'Button', key: 'open' })).toBeUndefined()
+    await ui.unmount()
+  }
+})
+
+test('where the band stacks a row per plugin, the button leaves its own row for the right end of the others', async ($, on) => {
+  const calls = beneath(on)
+  await $.session.start(START)
+
+  const ui = await $.ui.mount({
+    plugin: PLUGIN,
+    surface: 'terminal',
+    component: 'AbovePromptList',
+    props: { ...BAND, rows: rows('usage-band', PLUGIN) },
+  })
+  expect(await ui.find({ type: 'Text', text: 'usage-band row' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: `${PLUGIN} row` })).toBeUndefined()
+  expect(await ui.drawn()).toMatchObject({ type: 'Box', props: { flexDirection: 'row' } })
+
+  await ui.press({ key: 'open' })
+  expect(calls.opened).toEqual([PLUGIN])
+})
+
+test('the stacked band stays as it is with no other row, with its own row taken away, off the terminal or under a survey', async ($, on) => {
+  beneath(on)
+  await $.session.start(START)
+
+  const cases = [
+    { surface: 'terminal', props: { ...BAND, rows: rows(PLUGIN) }, shown: [`${PLUGIN} row`] },
+    { surface: 'terminal', props: { ...BAND, rows: rows('usage-band') }, shown: ['usage-band row'] },
+    { surface: 'terminal', props: { ...BAND, hasSurvey: true, rows: rows('usage-band', PLUGIN) }, shown: ['usage-band row'] },
+    { surface: 'desktop', props: { ...BAND, rows: rows('usage-band', PLUGIN) }, shown: ['usage-band row', `${PLUGIN} row`] },
+  ] as const
+  for (const { surface, props, shown } of cases) {
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, component: 'AbovePromptList', props })
+
+    for (const text of shown) {
+      expect(await ui.find({ type: 'Text', text })).toBeDefined()
+    }
     expect(await ui.find({ type: 'Button', key: 'open' })).toBeUndefined()
     await ui.unmount()
   }

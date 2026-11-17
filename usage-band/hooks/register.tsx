@@ -133,7 +133,9 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // The band is shared: what the plugins beneath draw there stays, beside the bars or under them where there is no room
+  // The bars are this plugin's row of the band, which the engine stacks with the other plugins' rows. What the hooks
+  // beneath answer for this row stays, beside the bars or under them where there is no room: engines that ask one
+  // chain for the whole band hand the other plugins' drawing on that way
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const data = await read($, reading)
     if (e.props.hasSurvey || data === null || data.windows.length === 0) {
